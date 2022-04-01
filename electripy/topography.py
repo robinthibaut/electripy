@@ -1,6 +1,7 @@
 # create a class to add topography information to the end of a profile defined by a text file
 import numpy as np
 
+
 class Topography:
     def __init__(self, profile: str, topography: str):
         """
@@ -43,10 +44,10 @@ class Topography:
         topo_list.append([0, topo_data[0][2]])
         for i in range(1, len(topo_data)):
             # compute the euclidean distance between the current point and the previous point
-            dist = np.linalg.norm(np.array(topo_data[i]) - np.array(topo_data[i-1]))
+            dist = np.linalg.norm(np.array(topo_data[i]) - np.array(topo_data[i - 1]))
             # dist = ((topo_data[i][0] - topo_data[i-1][0])**2 + (topo_data[i][1] - topo_data[i-1][1])**2)**0.5
             # add the distance to the previous elevation
-            topo_list.append([topo_list[i-1][0] + dist, topo_data[i][2]])
+            topo_list.append([topo_list[i - 1][0] + dist, topo_data[i][2]])
         self.topo_list = topo_list
         # return the list of elevations
         return topo_list
@@ -80,10 +81,15 @@ class Topography:
         # return the new file name
         return new_file
 
+
 # test the class
 if __name__ == '__main__':
     # create a topography class
-    topo = Topography('/Users/robin/PycharmProjects/electripy/data/Project8_G7_1.dat', '/Users/robin/PycharmProjects/electripy/data/Coordinate_P3.txt')
+    # you need to input the profile file and the topography file
+    # make sure that they match
+    # just get the new file in the same folder as the profile file (_topo.dat)
+    topo = Topography('/Users/robin/PycharmProjects/electripy/data/Project8_G7_1.dat',
+                      '/Users/robin/PycharmProjects/electripy/data/Coordinate_P3.txt')
     # read the topography data
     topo_data = topo.read_topo()
     # print the total distance of the profile
@@ -92,6 +98,3 @@ if __name__ == '__main__':
     print(topo_data)
     # add the topography to the profile
     topo.add_topo()
-
-
-
