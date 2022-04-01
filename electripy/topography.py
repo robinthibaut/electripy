@@ -1,79 +1,97 @@
-import os
-from os.path import join as jp
-
-import geopy.distance as gpd
-import matplotlib.pyplot as plt
+# create a class to add topography information to the end of a profile defined by a text file
 import numpy as np
-import pandas as pd
-import rasterio
+
+class Topography:
+    def __init__(self, profile: str, topography: str):
+        """
+        This class adds topography to the end of a profile defined by a text file.
+        It saves the topography data in a separate text file.
+        :param profile: the profile file to add topography to
+        :param topography: the topography file to read
+        """
+        self.profile = profile
+        self.topo_file = topography
+        self.topo_list = []
+
+    # create a function to read topography data from a text file. Topography data is in the form of: X(m), Y(m), Z(m)
+    def read_topo(self):
+        # read in the topography file
+        with open(self.topo_file, 'r') as f:
+            topo_data = f.readlines()
+        # the file is a space delimited text file, so split the lines by spaces
+        topo_data = [line.split() for line in topo_data]
+
+        # convert the data to floats (some coordinates are strings starting with zeros, so remove them)
+        def strip_zeros(x):
+            """removes multiple zeros starting a string"""
+            # count how many zeros are at the beginning of the string
+            zeros = 0
+            for char in x:
+                if char == '0':
+                    zeros += 1
+                else:
+                    break
+            # remove the zeros
+            x = x[zeros:]
+            return x
+
+        topo_data = [[float(strip_zeros(x)) for x in line] for line in topo_data]
+        # create a 2D list to store the topography data [[0, z1], [d1, z2], [d3, z3], ...]
+        topo_list = []
+        # the starting elevation is 0, we have to compute the euclidean distance between the X and Y coordinates to
+        # return the list of elevations for the profile
+        topo_list.append([0, topo_data[0][2]])
+        for i in range(1, len(topo_data)):
+            # compute the euclidean distance between the current point and the previous point
+            dist = np.linalg.norm(np.array(topo_data[i]) - np.array(topo_data[i-1]))
+            # dist = ((topo_data[i][0] - topo_data[i-1][0])**2 + (topo_data[i][1] - topo_data[i-1][1])**2)**0.5
+            # add the distance to the previous elevation
+            topo_list.append([topo_list[i-1][0] + dist, topo_data[i][2]])
+        self.topo_list = topo_list
+        # return the list of elevations
+        return topo_list
+
+    # create a function to add topography to the profile
+    def add_topo(self):
+        header = "Topography in separate list"
+        # at the end of the profile file, add the following:
+        # header
+        # 1
+        # number of points
+        # X(m),Z(m) for each point
+
+        # read in the profile file. We just need to read it and add the topography to the end
+        with open(self.profile, 'r') as f:
+            profile_data = f.read()
+            # add the header
+            profile_data += "\n" + header + "\n" + "1\n" + str(len(self.topo_list)) + "\n"
+            # add the topography data
+            for point in self.topo_list:
+                profile_data += str(point[0]) + "," + str(point[1]) + "\n"
+            # add a 0 to the end of the profile data
+            profile_data += "0\n"
+            # add 4 zeros to the end of the profile data
+            profile_data += "0,0,0,0\n"
+        # write the profile file with the topography data
+        # define a new file name
+        new_file = self.profile[:-4] + "_topo.dat"
+        with open(new_file, 'w') as f:
+            f.write(profile_data)
+        # return the new file name
+        return new_file
+
+# test the class
+if __name__ == '__main__':
+    # create a topography class
+    topo = Topography('/Users/robin/PycharmProjects/electripy/data/Project8_G7_1.dat', '/Users/robin/PycharmProjects/electripy/data/Coordinate_P3.txt')
+    # read the topography data
+    topo_data = topo.read_topo()
+    # print the total distance of the profile
+    print(topo_data[-1][0])
+    # print the topography data
+    print(topo_data)
+    # add the topography to the profile
+    topo.add_topo()
 
 
-def datread(file=None, header=0):
-    """Reads space separated dat file"""
-    with open(file, 'r') as fr:
-        op = np.array([list(map(float, l.split())) for l in fr.readlines()[header:]])
-    return op
 
-cc = datread('coords2.txt')
-cc = cc.reshape((cc.shape[0], 2, 2))
-cc = np.flip(cc, axis=2)
-
-ft = "n11_e108_1arc_v3.tif"
-dataset = rasterio.open(ft)
-# dataset.bounds
-# dataset.indexes
-# Elevation data:
-r = dataset.read(1)
-# dataset.height
-# dataset.width
-# row, col = dataset.index(108.246179,11.063655)  # Enter long, lat to get row col of corresponding elevation.
-# elp = r[row, col]
-
-
-def get_topo(sp, ep):
-    # Format geopy should be : lat/long
-    d = int(gpd.distance(sp, ep).m)
-    nsteps = int(d/5)
-    lats = np.linspace(sp[0], ep[0], nsteps)
-    longs = np.linspace(sp[1], ep[1], nsteps)
-    coords = list(zip(longs, lats))
-    rc = [dataset.index(b[0], b[1]) for b in coords]
-    elevs = [r[t[0], t[1]] for t in rc]
-    dists = [gpd.distance(sp, cc[::-1]).m for cc in coords]
-
-    return np.array(list(zip(dists, elevs)))
-
-
-cross = [get_topo(a[0], a[1]) for a in cc]
-
-names = ['CD', 'EF']
-for c in range(len(cross)):
-    # np.savetxt(names[c].rstrip()+'.dat', cross[c], fmt='%.3f', delimiter=',')
-    df = pd.DataFrame(cross[c])
-    filepath = names[c].rstrip()+'.xlsx'
-    df.to_excel(filepath, index=False, header=['x', 'z'])
-#
-# p1s = (11.1871594, 108.5334544)
-# p1e = (11.2074242, 108.5344572)
-# test = get_topo(p1s, p1e)
-#
-# fig, ax = plt.subplots()
-# plt.plot(test[:, 0], test[:, 1])
-# plt.title("Elevation profile")
-# plt.xlabel("Distance (m)")
-# plt.ylabel("Elevation (m)")
-# plt.xlim(0, test[:, 0].max())
-# ax.set_aspect(7)
-# plt.show()
-# plt.savefig('{}.png'.format('linh'), dpi=300, bbox_inches='tight')
-# plt.close()
-
-for test in cross:
-    fig, ax = plt.subplots()
-    plt.plot(test[:, 0], test[:, 1])
-    plt.title("Elevation profile")
-    plt.xlabel("Distance (m)")
-    plt.ylabel("Elevation (m)")
-    plt.xlim(0, test[:, 0].max())
-    ax.set_aspect(7)
-    plt.show()
