@@ -65,7 +65,7 @@ class Topography:
         with open(self.profile, 'r') as f:
             profile_data = f.read()
             # add the header
-            profile_data += "\n" + header + "\n" + "1\n" + str(len(self.topo_list)) + "\n"
+            profile_data += header + "\n" + "1\n" + str(len(self.topo_list)) + "\n"
             # add the topography data
             for point in self.topo_list:
                 profile_data += str(point[0]) + "," + str(point[1]) + "\n"
